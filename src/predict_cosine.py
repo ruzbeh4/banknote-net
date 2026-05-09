@@ -13,7 +13,7 @@ def parse_arguments():
     parser.add_argument("--data_path", type=str, default="./data/IRR/val/")
     parser.add_argument("--enc_path", type=str, default="./models/banknote_net_encoder.h5")
     parser.add_argument("--centroids_path", type=str, default="./src/trained_models/cosine_centroids.pkl")
-    parser.add_argument("--threshold", type=float, default=0.70)
+    parser.add_argument("--threshold", type=float, default=0.80)
     return parser.parse_args()
 
 
