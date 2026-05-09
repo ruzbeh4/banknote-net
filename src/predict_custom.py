@@ -1,122 +1,71 @@
-"""
-    Copyright (c) Microsoft Corporation. All rights reserved.
-    Licensed under the MIT License.
-
-    Trains a model using images as input located in a custom folder and 
-    the pre-trained banknote_net encoder network (MobileNet V2).
-"""
-
 import argparse
 import os
-
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
-
 def parse_arguments():
-    """Parses arguments for prediction.
-
-    Returns:
-        ArgumentParser: argparse parsed arguments.
-    """
-    # Parse arguments and load data
-    parser = argparse.ArgumentParser(
-        description="Perform inference using trained custom classifier."
-    )
-    parser.add_argument(
-        "--bsize",
-        "--b",
-        type=int,
-        help="Batch size",
-        default=1,
-    )
-    parser.add_argument(
-        "--data_path",
-        "--data",
-        type=str,
-        help="Path to custom folder with validation images.",
-        default="./data/example_images/SEK/val/",
-    )
-    parser.add_argument(
-        "--model_path",
-        "--enc",
-        type=str,
-        help="Path to .h5 file of a trained classification model",
-        default="./src/trained_models/custom_classifier.h5",
-    )
-
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--bsize", type=int, default=1)
+    parser.add_argument("--data_path", type=str, default="./data/IRR/", help="Path to IRR folder containing train/ and val/")
+    parser.add_argument("--model_path", type=str, default="./src/trained_models/custom_classifier.h5")
+    parser.add_argument("--threshold", type=float, default=0.5)
     return parser.parse_args()
 
-
-def create_generator(
-    VAL_PATH: str,
-    IMG_SIZE: tuple,
-    BATCH_SIZE: int = 2,
-    NUM_CLASSES: int = 10,
-):
-    """Creates tensorflow datasets for custom directory
-
-    Args:
-        TRAIN_PATH (str): Train path for custom training data.
-        VAL_PATH (str): Validation path for validation data.
-        IMG_SIZE (tuple): Size of image in pixels, not including channels (224, 224)
-        BATCH_SIZE (int, optional): Batch size. Defaults to 2.
-        NUM_CLASSES (int, optional): Number of classes. Defaults to 10.
-
-    Returns:
-        train_ds, val_ds (tf.data.Dataset)
-    """
-
-    IMG_WIDTH, IMG_HEIGHT = IMG_SIZE
-
-    # Prepare data generators, train generator has some data augmentation
-    test_datagen = ImageDataGenerator(
-        rescale=1.0 / 255,
-    )
-    validation_generator = test_datagen.flow_from_directory(
-        VAL_PATH,
-        target_size=(IMG_WIDTH, IMG_HEIGHT),
-        batch_size=BATCH_SIZE,
-        shuffle=False,
-        class_mode="categorical",
-    )
-    val_ds = tf.data.Dataset.from_generator(
-        lambda: validation_generator,
-        output_types=(tf.float32, tf.float32),
-        output_shapes=([None, IMG_HEIGHT, IMG_WIDTH, 3], [None, NUM_CLASSES]),
-    )
-
-    return val_ds
-
-
 def main():
-    """Trains classifier for custom class and data directory."""
-
     args = parse_arguments()
-    BATCH_SIZE = args.bsize
-    MODEL_PATH = args.model_path
-    DATA_PATH = args.data_path
-    NUM_CLASSES = 8
     IMG_SIZE = (224, 224)
 
-    # Load datasets from embeddings
-    val_ds = create_generator(
-        VAL_PATH=f"{DATA_PATH}",
-        IMG_SIZE=IMG_SIZE,
-        BATCH_SIZE=BATCH_SIZE,
-        NUM_CLASSES=NUM_CLASSES,
+    # SOURCE OF TRUTH: Get classes from the TRAIN folder (always 12)
+    train_dir = os.path.join(args.data_path, "train")
+    class_names = sorted([d for d in os.listdir(train_dir) if os.path.isdir(os.path.join(train_dir, d))])
+    NUM_CLASSES = len(class_names)
+    index_to_class = {i: name for i, name in enumerate(class_names)}
+
+    # DATA TO TEST: Look at the VAL folder (can have 13+ folders now)
+    val_dir = os.path.join(args.data_path, "val")
+    test_gen = ImageDataGenerator(rescale=1.0 / 255).flow_from_directory(
+        val_dir, target_size=IMG_SIZE, batch_size=1, shuffle=False, class_mode=None # class_mode=None prevents label mismatch
     )
 
-    # Load model and make predictions
-    model = load_model(MODEL_PATH)
+    model = load_model(args.model_path)
+    preds = model.predict(test_gen, steps=test_gen.samples)
 
-    predictions = model.predict(val_ds, batch_size=1, steps=15)
-    predictions = np.argmax(predictions, axis=1)
-    print("Predictions:")
-    print(predictions)
+    print("\n" + "="*75 + "\nNN PREDICTIONS (Handling 'None' folder)\n" + "="*75)
+    correct = 0
 
+    for i in range(test_gen.samples):
+        # Identify the actual folder name
+        full_path = test_gen.filenames[i].replace('\\', '/')
+        actual_folder = full_path.split('/')[0]
+
+        img_probs = preds[i]
+        top_idx = np.argmax(img_probs)
+        conf = img_probs[top_idx]
+
+        # Logic for "None" detection
+        if conf < args.threshold:
+            pred_label = "NONE"
+        else:
+            pred_label = index_to_class[top_idx]
+
+        # Accuracy Logic:
+        # If actual folder is 'None', prediction must be 'NONE' to be correct.
+        # If actual folder is a banknote, prediction must match that folder name.
+        is_correct = False
+        if actual_folder.lower() == "none":
+            if pred_label == "NONE": is_correct = True
+        else:
+            if pred_label == actual_folder: is_correct = True
+
+        status = "✓" if is_correct else "✗"
+        if is_correct: correct += 1
+
+        print(f"[{status}] {full_path:<40} -> Predicted: {pred_label:<18} (Conf: {conf:.2f})")
+
+    acc = (correct / test_gen.samples) * 100
+    print(f"\nFinal Accuracy: {correct}/{test_gen.samples} ({acc:.2f}%)")
 
 if __name__ == "__main__":
     main()
