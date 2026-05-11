@@ -8,9 +8,9 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--bsize", type=int, default=1)
-    parser.add_argument("--data_path", type=str, default="./data/IRR/", help="Path to IRR folder containing train/ and val/")
+    parser.add_argument("--data_path", type=str, default="./data/IRR/processed1", help="Path to IRR folder containing train/ and val/")
     parser.add_argument("--model_path", type=str, default="./src/trained_models/custom_classifier.h5")
-    parser.add_argument("--threshold", type=float, default=0.5)
+    parser.add_argument("--threshold", type=float, default=0.85)
     return parser.parse_args()
 
 def main():
@@ -24,7 +24,7 @@ def main():
     index_to_class = {i: name for i, name in enumerate(class_names)}
 
     # DATA TO TEST: Look at the VAL folder (can have 13+ folders now)
-    val_dir = os.path.join(args.data_path, "val")
+    val_dir = os.path.join(args.data_path, "test")
     test_gen = ImageDataGenerator(rescale=1.0 / 255).flow_from_directory(
         val_dir, target_size=IMG_SIZE, batch_size=1, shuffle=False, class_mode=None # class_mode=None prevents label mismatch
     )

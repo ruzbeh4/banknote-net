@@ -18,12 +18,7 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 
 def parse_arguments():
-    """Parses arguments for shallow classifier training.
-
-    Returns:
-        ArgumentParser: argparse parsed arguments.
-    """
-    # Parse arguments and load data
+    """Parses arguments for shallow classifier training."""
     parser = argparse.ArgumentParser(
         description="Train model from custom image folder using pre-trained BankNote-Net encoder."
     )
@@ -46,14 +41,14 @@ def parse_arguments():
         "--data",
         type=str,
         help="Path to folder with images.",
-        default="../data/example_images/SEK/",
+        default="./data/IRR/processed1",
     )
     parser.add_argument(
         "--enc_path",
         "--enc",
         type=str,
         help="Path to .h5 file of pre-trained encoder model",
-        default="../models/banknote_net_encoder.h5",
+        default="./models/banknote_net_encoder.h5",
     )
 
     return parser.parse_args()
@@ -63,25 +58,14 @@ def create_generator(
     TRAIN_PATH: str,
     VAL_PATH: str,
     IMG_SIZE: tuple,
+    CLASS_NAMES: list,  # Added this to force strict class matching
     BATCH_SIZE: int = 2,
-    NUM_CLASSES: int = 10,
 ):
-    """Creates tensorflow datasets for custom directory
-
-    Args:
-        TRAIN_PATH (str): Train path for custom training data.
-        VAL_PATH (str): Validation path for validation data.
-        IMG_SIZE (tuple): Size of image in pixels, not including channels (224, 224)
-        BATCH_SIZE (int, optional): Batch size. Defaults to 2.
-        NUM_CLASSES (int, optional): Number of classes. Defaults to 10.
-
-    Returns:
-        train_ds, val_ds (tf.data.Dataset)
-    """
+    """Creates tensorflow datasets for custom directory"""
 
     IMG_WIDTH, IMG_HEIGHT = IMG_SIZE
+    NUM_CLASSES = len(CLASS_NAMES)
 
-    # Prepare data generators, train generator has some data augmentation
     train_datagen = ImageDataGenerator(
         rescale=1.0 / 255,
         samplewise_center=False,
@@ -94,13 +78,13 @@ def create_generator(
         rescale=1.0 / 255,
     )
 
-    # Initiliaze generators and create TF datasets
     train_generator = train_datagen.flow_from_directory(
         TRAIN_PATH,
         target_size=(IMG_WIDTH, IMG_HEIGHT),
         batch_size=BATCH_SIZE,
         shuffle=True,
         seed=12345,
+        classes=CLASS_NAMES,  # Forces generator to only use the 12 training classes
         class_mode="categorical",
     )
     validation_generator = test_datagen.flow_from_directory(
@@ -108,8 +92,10 @@ def create_generator(
         target_size=(IMG_WIDTH, IMG_HEIGHT),
         batch_size=BATCH_SIZE,
         shuffle=False,
+        classes=CLASS_NAMES,  # Forces generator to ignore the 13th 'None' folder
         class_mode="categorical",
     )
+
     train_ds = tf.data.Dataset.from_generator(
         lambda: train_generator,
         output_types=(tf.float32, tf.float32),
@@ -132,22 +118,25 @@ def main():
     NB_EPOCH = args.epochs
     ENC_PATH = args.enc_path
     DATA_PATH = args.data_path
-    NUM_CLASSES = len(next(os.walk(f"{DATA_PATH}/train/"))[1])
-    IMG_SIZE = (224, 224)
-    NB_TRAINING_SAMPLES = sum(
-        [len(files) for r, d, files in os.walk(f"{DATA_PATH}/train/")]
-    )
-    NB_VALIDATION_SAMPLES = sum(
-        [len(files) for r, d, files in os.walk(f"{DATA_PATH}/val/")]
-    )
 
-    # Load datasets from embeddings
+    # Get the exact 12 class names from the train folder
+    train_dir = os.path.join(DATA_PATH, "train")
+    val_dir = os.path.join(DATA_PATH, "val")
+    class_names = sorted([d for d in os.listdir(train_dir) if os.path.isdir(os.path.join(train_dir, d))])
+    NUM_CLASSES = len(class_names)
+
+    IMG_SIZE = (224, 224)
+    NB_TRAINING_SAMPLES = sum([len(files) for r, d, files in os.walk(train_dir)])
+    # Only count validation files that belong to our 12 actual classes
+    NB_VALIDATION_SAMPLES = sum([len(files) for r, d, files in os.walk(val_dir) if os.path.basename(r) in class_names])
+
+    # Load datasets
     train_ds, val_ds = create_generator(
-        TRAIN_PATH=f"{DATA_PATH}/train/",
-        VAL_PATH=f"{DATA_PATH}/val/",
+        TRAIN_PATH=train_dir,
+        VAL_PATH=val_dir,
         IMG_SIZE=IMG_SIZE,
+        CLASS_NAMES=class_names, # Pass the strict list of 12 classes
         BATCH_SIZE=BATCH_SIZE,
-        NUM_CLASSES=NUM_CLASSES,
     )
 
     # Load encoder model and freeze layers
@@ -155,13 +144,16 @@ def main():
     for layer in encoder.layers:
         layer.trainable = False
 
-    input = Input(shape=(IMG_SIZE[0], IMG_SIZE[1], 3))
-    x = encoder(input)
+    input_layer = Input(shape=(IMG_SIZE[0], IMG_SIZE[1], 3))
+    x = encoder(input_layer)
     x = Dense(256, activation="relu")(x)
     x = Dropout(0.5)(x)
     x = Dense(NUM_CLASSES, activation="softmax")(x)
-    model = Model(inputs=input, outputs=x)
+    model = Model(inputs=input_layer, outputs=x)
     model.summary()
+
+    # Create trained_models folder if it doesn't exist
+    os.makedirs("./src/trained_models/", exist_ok=True)
 
     # Define callbacks, compile and fit
     checkpoint = ModelCheckpoint(
@@ -170,10 +162,10 @@ def main():
         save_best_only=True,
     )
 
-    # Compile and fit
+    # Compile and fit (Updated lr to learning_rate to avoid deprecation warning)
     model.compile(
         loss="categorical_crossentropy",
-        optimizer=tf.keras.optimizers.Adam(lr=1e-3),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
         metrics=[
             "acc",
             tf.keras.metrics.Precision(),
@@ -183,9 +175,9 @@ def main():
 
     model.fit(
         train_ds,
-        steps_per_epoch=NB_TRAINING_SAMPLES // BATCH_SIZE,
+        steps_per_epoch=max(1, NB_TRAINING_SAMPLES // BATCH_SIZE),
         epochs=NB_EPOCH,
-        validation_steps=NB_VALIDATION_SAMPLES // BATCH_SIZE + 1,
+        validation_steps=max(1, NB_VALIDATION_SAMPLES // BATCH_SIZE),
         validation_data=val_ds,
         callbacks=[checkpoint],
     )

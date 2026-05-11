@@ -8,10 +8,11 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 
 def parse_arguments():
+    default_folder = "processed1"
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_path", type=str, default="./data/IRR/train/")
-    parser.add_argument("--enc_path", type=str, default="./models/banknote_net_encoder.h5")
-    parser.add_argument("--save_path", type=str, default="./src/trained_models/cosine_centroids.pkl")
+    parser.add_argument("--data_path", type=str, default=f"./data/IRR/{default_folder}/train/")
+    parser.add_argument("--enc_path", type=str, default=f"./models/banknote_net_encoder.h5")
+    parser.add_argument("--save_path", type=str, default=f"./src/trained_models/cosine_centroids.pkl")
     return parser.parse_args()
 
 
