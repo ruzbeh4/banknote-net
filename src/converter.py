@@ -7,7 +7,9 @@ import tensorflow as tf
 
 # 1. Load the actual Microsoft Keras model from their repo folder
 # (Make sure this path points to the exact .h5 file you want to use)
-keras_model_path = 'banknote_net_encoder.h5'
+# keras_model_path = '../models/banknote_net_encoder.h5'
+address = './trained_models/custom_classifier'
+keras_model_path = f'{address}.h5'
 model = tf.keras.models.load_model(keras_model_path)
 
 # 2. Tell TensorFlow to convert it
@@ -20,7 +22,7 @@ converter.optimizations = [tf.lite.Optimize.DEFAULT]
 tflite_model = converter.convert()
 
 # 5. Save the final file that you will drag into your Flutter app
-with open('microsoft_banknote.tflite', 'wb') as f:
+with open(f'{address}.tflite', 'wb') as f:
     f.write(tflite_model)
 
 print("Boom! Conversion complete.")
