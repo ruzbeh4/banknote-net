@@ -10,7 +10,7 @@ def parse_arguments():
     parser.add_argument("--bsize", type=int, default=1)
     parser.add_argument("--data_path", type=str, default="./data/IRR/processed1", help="Path to IRR folder containing train/ and val/")
     parser.add_argument("--model_path", type=str, default="./src/trained_models/custom_classifier.h5")
-    parser.add_argument("--threshold", type=float, default=0.85)
+    parser.add_argument("--threshold", type=float, default=0.8)
     return parser.parse_args()
 
 def main():
@@ -23,7 +23,7 @@ def main():
     NUM_CLASSES = len(class_names)
     index_to_class = {i: name for i, name in enumerate(class_names)}
 
-    # DATA TO TEST: Look at the VAL folder (can have 13+ folders now)
+    # DATA TO TEST: Look at the test folder (can have 13+ folders now)
     val_dir = os.path.join(args.data_path, "test")
     test_gen = ImageDataGenerator(rescale=1.0 / 255).flow_from_directory(
         val_dir, target_size=IMG_SIZE, batch_size=1, shuffle=False, class_mode=None # class_mode=None prevents label mismatch

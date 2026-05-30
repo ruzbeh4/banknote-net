@@ -40,9 +40,9 @@ def squash_and_resize(input_folder, output_folder, target_size=224):
 
 
 # Set up your paths
-input_dir = r'../data/IRR/raw'
+input_dir = r'./data/IRR/processed2'
 # This creates a folder named 'processed' right next to 'raw'
-output_dir = r'../data/IRR/processed1'
+output_dir = r'./data/IRR/processed2-resized'
 
 print(f"Looking for images in: {input_dir}")
 
