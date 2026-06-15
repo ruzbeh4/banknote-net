@@ -41,7 +41,7 @@ def parse_arguments():
         "--data",
         type=str,
         help="Path to folder with images.",
-        default="./data/IRR/processed1",
+        default="./data/IRR/processed2-resized",
     )
     parser.add_argument(
         "--enc_path",

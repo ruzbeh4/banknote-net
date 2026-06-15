@@ -8,7 +8,7 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--bsize", type=int, default=1)
-    parser.add_argument("--data_path", type=str, default="./data/IRR/processed1", help="Path to IRR folder containing train/ and val/")
+    parser.add_argument("--data_path", type=str, default="./data/IRR/processed2-resized", help="Path to IRR folder containing train/ and val/")
     parser.add_argument("--model_path", type=str, default="./src/trained_models/custom_classifier.h5")
     parser.add_argument("--threshold", type=float, default=0.8)
     return parser.parse_args()
