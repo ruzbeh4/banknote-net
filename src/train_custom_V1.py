@@ -27,14 +27,14 @@ def parse_arguments():
         "--b",
         type=int,
         help="Batch size",
-        default=4,  # Restored to original default
+        default=4,
     )
     parser.add_argument(
         "--epochs",
         "--e",
         type=int,
         help="Number of epochs for training shallow top classifier",
-        default=25,  # Restored to original default
+        default=25,
     )
     parser.add_argument(
         "--data_path",
@@ -55,16 +55,17 @@ def parse_arguments():
 
 
 def create_generator(
-    DATA_DIR: str,
+    TRAIN_PATH: str,
+    VAL_PATH: str,
     IMG_SIZE: tuple,
-    BATCH_SIZE: int,
+    CLASS_NAMES: list,  # Added this to force strict class matching
+    BATCH_SIZE: int = 2,
 ):
-    """Creates tensorflow datasets utilizing inner Keras validation split."""
+    """Creates tensorflow datasets for custom directory"""
 
     IMG_WIDTH, IMG_HEIGHT = IMG_SIZE
-    SPLIT_SEED = 12345  # Locks the split so train and val don't overlap
+    NUM_CLASSES = len(CLASS_NAMES)
 
-    # Training Generator (Includes augmentation + 20% split directive)
     train_datagen = ImageDataGenerator(
         rescale=1.0 / 255,
         samplewise_center=False,
@@ -72,39 +73,41 @@ def create_generator(
         rotation_range=180,
         channel_shift_range=40,
         fill_mode="nearest",
-        validation_split=0.2,
     )
-
-    # Validation Generator (NO augmentation, strictly shares the same split directive)
     test_datagen = ImageDataGenerator(
         rescale=1.0 / 255,
-        validation_split=0.2,
     )
 
     train_generator = train_datagen.flow_from_directory(
-        DATA_DIR,
+        TRAIN_PATH,
         target_size=(IMG_WIDTH, IMG_HEIGHT),
         batch_size=BATCH_SIZE,
         shuffle=True,
-        seed=SPLIT_SEED,
+        seed=12345,
+        classes=CLASS_NAMES,  # Forces generator to only use the 12 training classes
         class_mode="categorical",
-        subset="training",
     )
-
     validation_generator = test_datagen.flow_from_directory(
-        DATA_DIR,
+        VAL_PATH,
         target_size=(IMG_WIDTH, IMG_HEIGHT),
         batch_size=BATCH_SIZE,
         shuffle=False,
-        seed=SPLIT_SEED,
+        classes=CLASS_NAMES,  # Forces generator to ignore the 13th 'None' folder
         class_mode="categorical",
-        subset="validation",
     )
 
-    NUM_CLASSES = train_generator.num_classes
+    train_ds = tf.data.Dataset.from_generator(
+        lambda: train_generator,
+        output_types=(tf.float32, tf.float32),
+        output_shapes=([None, IMG_HEIGHT, IMG_WIDTH, 3], [None, NUM_CLASSES]),
+    )
+    val_ds = tf.data.Dataset.from_generator(
+        lambda: validation_generator,
+        output_types=(tf.float32, tf.float32),
+        output_shapes=([None, IMG_HEIGHT, IMG_WIDTH, 3], [None, NUM_CLASSES]),
+    )
 
-    # Returning raw generators directly prevents tf.data bottlenecking
-    return train_generator, validation_generator, train_generator.samples, validation_generator.samples, NUM_CLASSES
+    return train_ds, val_ds
 
 
 def main():
@@ -116,18 +119,25 @@ def main():
     ENC_PATH = args.enc_path
     DATA_PATH = args.data_path
 
-    # Point directly to the train folder
+    # Get the exact 12 class names from the train folder
     train_dir = os.path.join(DATA_PATH, "train")
-    IMG_SIZE = (224, 224)
+    val_dir = os.path.join(DATA_PATH, "val")
+    class_names = sorted([d for d in os.listdir(train_dir) if os.path.isdir(os.path.join(train_dir, d))])
+    NUM_CLASSES = len(class_names)
 
-    # Load generators
-    train_gen, val_gen, NB_TRAINING_SAMPLES, NB_VALIDATION_SAMPLES, NUM_CLASSES = create_generator(
-        DATA_DIR=train_dir,
+    IMG_SIZE = (224, 224)
+    NB_TRAINING_SAMPLES = sum([len(files) for r, d, files in os.walk(train_dir)])
+    # Only count validation files that belong to our 12 actual classes
+    NB_VALIDATION_SAMPLES = sum([len(files) for r, d, files in os.walk(val_dir) if os.path.basename(r) in class_names])
+
+    # Load datasets
+    train_ds, val_ds = create_generator(
+        TRAIN_PATH=train_dir,
+        VAL_PATH=val_dir,
         IMG_SIZE=IMG_SIZE,
+        CLASS_NAMES=class_names, # Pass the strict list of 12 classes
         BATCH_SIZE=BATCH_SIZE,
     )
-
-    print(f"\nFound {NB_TRAINING_SAMPLES} training samples and {NB_VALIDATION_SAMPLES} validation samples across {NUM_CLASSES} classes.\n")
 
     # Load encoder model and freeze layers
     encoder = load_model(ENC_PATH)
@@ -142,14 +152,17 @@ def main():
     model = Model(inputs=input_layer, outputs=x)
     model.summary()
 
+    # Create trained_models folder if it doesn't exist
     os.makedirs("./src/trained_models/", exist_ok=True)
 
+    # Define callbacks, compile and fit
     checkpoint = ModelCheckpoint(
         filepath="./src/trained_models/custom_classifier.h5",
         monitor="val_acc",
         save_best_only=True,
     )
 
+    # Compile and fit (Updated lr to learning_rate to avoid deprecation warning)
     model.compile(
         loss="categorical_crossentropy",
         optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
@@ -160,13 +173,12 @@ def main():
         ],
     )
 
-    # Fit using stable raw generators
     model.fit(
-        train_gen,
+        train_ds,
         steps_per_epoch=max(1, NB_TRAINING_SAMPLES // BATCH_SIZE),
         epochs=NB_EPOCH,
-        validation_data=val_gen,
         validation_steps=max(1, NB_VALIDATION_SAMPLES // BATCH_SIZE),
+        validation_data=val_ds,
         callbacks=[checkpoint],
     )
 
