@@ -1,7 +1,7 @@
 #retraining the banknote-net:
 conda activate py310
 python ./src/train_custom.py  --> default folder is processed2-resized
-python ./src/predict
+python ./src/predict_custom.py
 
 open collab project. upload converter.py and h5 into collab. run cells with ###### encoder comment at start
 download the tflite and rename and version it
