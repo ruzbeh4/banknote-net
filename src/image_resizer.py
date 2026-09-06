@@ -1,53 +1,54 @@
+# use this script when you want to squash images after crop to accepted 224*224 banknote-net input
 import os
-from PIL import Image
+from PIL import Image, ImageOps
 
 
-def pad_and_resize(folder_path, target_size=224):
-    # Find all images in the IRR folder and subfolders
-    for root, dirs, files in os.walk(folder_path):
+def squash_and_resize(input_folder, output_folder, target_size=224):
+    os.makedirs(output_folder, exist_ok=True)
+
+    for root, dirs, files in os.walk(input_folder):
         for file in files:
             if file.lower().endswith(('.png', '.jpg', '.jpeg')):
                 img_path = os.path.join(root, file)
+                rel_dir = os.path.relpath(root, input_folder)
+                target_subfolder = os.path.join(output_folder, rel_dir)
+                os.makedirs(target_subfolder, exist_ok=True)
+                dest_path = os.path.join(target_subfolder, file)
 
                 try:
-                    # Open the image
-                    img = Image.open(img_path).convert('RGB')
+                    # 2. Open the image
+                    img = Image.open(img_path)
+
+                    # 3. Apply the EXIF rotation permanently to the pixels
+                    img = ImageOps.exif_transpose(img)
+
+                    # 4. Now convert to RGB
+                    img = img.convert('RGB')
+
                     w, h = img.size
 
-                    # If it's already exactly 224x224, skip it
                     if w == target_size and h == target_size:
+                        img.save(dest_path)
                         continue
 
-                    # 1. Find the longest side to make a square
-                    max_dim = max(w, h)
-
-                    # 2. Create a new black square image
-                    square_img = Image.new('RGB', (max_dim, max_dim), (0, 0, 0))
-
-                    # 3. Paste the original 16:9 image exactly in the center
-                    paste_x = (max_dim - w) // 2
-                    paste_y = (max_dim - h) // 2
-                    square_img.paste(img, (paste_x, paste_y))
-
-                    # 4. Resize the padded square down to 224x224
-                    # (Using high-quality Lanczos resampling)
-                    final_img = square_img.resize((target_size, target_size), Image.LANCZOS)
-
-                    # Overwrite the original image
-                    final_img.save(img_path)
-                    print(f"Fixed: {img_path}")
+                    final_img = img.resize((target_size, target_size), Image.LANCZOS)
+                    final_img.save(dest_path)
+                    print(f"Saved: {dest_path}")
 
                 except Exception as e:
                     print(f"Error processing {img_path}: {e}")
 
 
-# Run the function on your IRR folder
-print("Looking for images...")
-target_dir = r'../data/IRR/raw'
+# Set up your paths
+input_dir = r'./data/crop_test/output_cropped'
+# This creates a folder named 'processed' right next to 'raw'
+output_dir = r'./data/IRR/processed-filteredByYolo/test/None'
 
-if not os.path.exists(target_dir):
-    print(f"ERROR: Could not find the folder at {target_dir}")
+print(f"Looking for images in: {input_dir}")
+
+if not os.path.exists(input_dir):
+    print(f"ERROR: Could not find the folder at {input_dir}")
 else:
-    print("Folder found! Starting image conversion...")
-    pad_and_resize(target_dir)
-    print("All images are now 224x224 squares!")
+    print(f"Starting conversion...\nOriginals kept in: {input_dir}\nSaving squashed copies to: {output_dir}")
+    squash_and_resize(input_dir, output_dir)
+    print("\nSuccess! All images are squashed to 224x224 and saved in the new folder structure.")

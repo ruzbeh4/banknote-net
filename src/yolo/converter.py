@@ -1,6 +1,6 @@
 from ultralytics import YOLO
 
-# Load your custom trained model
+# Load your custom trained model(you must first train the model so it appears in run folder)
 model = YOLO('./runs/detect/banknote_cropper/weights/best.pt')
 
 # Export to TFLite format

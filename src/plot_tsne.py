@@ -45,7 +45,7 @@ def main():
     print("Loading Encoder...")
     encoder = load_model(args.enc_path)
 
-    subdirs = ["train", "val", "test"]
+    subdirs = ["train", "test"]
     all_embeddings = []
     all_labels = []
 

@@ -7,7 +7,6 @@ import tensorflow as tf
 
 # 1. Load the actual Microsoft Keras model from their repo folder
 # (Make sure this path points to the exact .h5 file you want to use)
-# keras_model_path = '../models/banknote_net_encoder.h5'
 address = './custom_classifier'
 keras_model_path = f'{address}.h5'
 model = tf.keras.models.load_model(keras_model_path)

@@ -8,9 +8,9 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--bsize", type=int, default=1)
-    parser.add_argument("--data_path", type=str, default="./data/IRR/processed2-resized", help="Path to IRR folder containing train/ and val/")
+    parser.add_argument("--data_path", type=str, default="./data/IRR/processed", help="Path to IRR folder containing train/ and test/")
     parser.add_argument("--model_path", type=str, default="./src/trained_models/custom_classifier.h5")
-    parser.add_argument("--threshold", type=float, default=0.8)
+    parser.add_argument("--threshold", type=float, default=0.7)
     return parser.parse_args()
 
 def main():
@@ -24,9 +24,9 @@ def main():
     index_to_class = {i: name for i, name in enumerate(class_names)}
 
     # DATA TO TEST: Look at the test folder (can have 13+ folders now)
-    val_dir = os.path.join(args.data_path, "test")
+    test_dir = os.path.join(args.data_path, "test")
     test_gen = ImageDataGenerator(rescale=1.0 / 255).flow_from_directory(
-        val_dir, target_size=IMG_SIZE, batch_size=1, shuffle=False, class_mode=None # class_mode=None prevents label mismatch
+        test_dir, target_size=IMG_SIZE, batch_size=1, shuffle=False, class_mode=None # class_mode=None prevents label mismatch
     )
 
     model = load_model(args.model_path)
@@ -34,6 +34,8 @@ def main():
 
     print("\n" + "="*75 + "\nNN PREDICTIONS (Handling 'None' folder)\n" + "="*75)
     correct = 0
+    corrects_without_background_noise = 0
+    total_banknotes = 0
 
     for i in range(test_gen.samples):
         # Identify the actual folder name
@@ -55,9 +57,13 @@ def main():
         # If actual folder is a banknote, prediction must match that folder name.
         is_correct = False
         if actual_folder.lower() == "none":
-            if pred_label == "NONE": is_correct = True
+            if pred_label == "NONE" or pred_label == "None": is_correct = True
         else:
-            if pred_label == actual_folder: is_correct = True
+            if pred_label == actual_folder:
+                is_correct = True
+                corrects_without_background_noise += 1
+            total_banknotes += 1
+
 
         status = "✓" if is_correct else "✗"
         if is_correct: correct += 1
@@ -65,7 +71,9 @@ def main():
         print(f"[{status}] {full_path:<40} -> Predicted: {pred_label:<18} (Conf: {conf:.2f})")
 
     acc = (correct / test_gen.samples) * 100
+    banknote_acc = (corrects_without_background_noise / total_banknotes) * 100
     print(f"\nFinal Accuracy: {correct}/{test_gen.samples} ({acc:.2f}%)")
+    print(f"\nAccuracy without background noise: {corrects_without_background_noise}/{total_banknotes} ({banknote_acc:.2f}%)")
 
 if __name__ == "__main__":
     main()

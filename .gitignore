@@ -351,7 +351,19 @@ MigrationBackup/
 
 .idea
 
-data/IRR/raw
 
-/data/
+/data/*
+!/data/IRR/
+!/data/crop_test/
+
+/data/IRR/*
+/data/crop_test/*
+!data/crop_test/input/
+!data/crop_test/output_cropped/
+!data/crop_test/output_debug/
+!data/IRR/processed/
+!data/IRR/processed-filteredByYolo/
+
 /runs/
+yolo26n.pt
+yolov8n.pt

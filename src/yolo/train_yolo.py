@@ -3,7 +3,7 @@ from ultralytics import YOLO
 # Put the execution logic inside this block!
 if __name__ == '__main__':
     # 1. Load the base pre-trained Nano model
-    model = YOLO('yolov8n.pt')
+    model = YOLO('yolo26n.pt')
 
     # 2. Train it on your newly cleaned dataset
     model.train(
