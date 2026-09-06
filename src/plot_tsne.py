@@ -11,7 +11,8 @@ import seaborn as sns
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Plot t-SNE of Banknote-Net Latent Space")
-    parser.add_argument("--data_path", type=str, default="./data/IRR/processed1")
+    # switch to processed-filtered-by-yolo to see pipeline of yolo+banknote-net results
+    parser.add_argument("--data_path", type=str, default="./data/IRR/processed")
     parser.add_argument("--enc_path", type=str, default="./models/banknote_net_encoder.h5")
     parser.add_argument("--save_plot", type=str, default="./tsne_latent_space.png")
     return parser.parse_args()

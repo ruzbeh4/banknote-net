@@ -362,7 +362,7 @@ MigrationBackup/
 !data/crop_test/output_cropped/
 !data/crop_test/output_debug/
 !data/IRR/processed/
-!data/IRR/processed-filteredByYolo/
+!data/IRR/processed-filtered-by-yolo/
 
 /runs/
 yolo26n.pt

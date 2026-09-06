@@ -8,6 +8,7 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--bsize", type=int, default=1)
+    # switch to processed-filtered-by-yolo to see pipeline of yolo+banknote-net results
     parser.add_argument("--data_path", type=str, default="./data/IRR/processed", help="Path to IRR folder containing train/ and test/")
     parser.add_argument("--model_path", type=str, default="./src/trained_models/custom_classifier.h5")
     parser.add_argument("--threshold", type=float, default=0.7)

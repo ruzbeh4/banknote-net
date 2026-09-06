@@ -27,21 +27,21 @@ def parse_arguments():
         "--b",
         type=int,
         help="Batch size",
-        default=4,  # Restored to original default
+        default=32,  # Restored to original default
     )
     parser.add_argument(
         "--epochs",
         "--e",
         type=int,
         help="Number of epochs for training shallow top classifier",
-        default=25,  # Restored to original default
+        default=40,  # Restored to original default
     )
     parser.add_argument(
         "--data_path",
         "--data",
         type=str,
         help="Path to folder with images.",
-        default="./data/IRR/processed2-resized",
+        default="./data/IRR/processed",
     )
     parser.add_argument(
         "--enc_path",
