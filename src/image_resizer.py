@@ -1,4 +1,5 @@
 # use this script when you want to squash images after crop to accepted 224*224 banknote-net input
+import argparse
 import os
 from PIL import Image, ImageOps
 
@@ -39,10 +40,16 @@ def squash_and_resize(input_folder, output_folder, target_size=224):
                     print(f"Error processing {img_path}: {e}")
 
 
-# Set up your paths
-input_dir = r'./data/crop_test/output_cropped'
-# This creates a folder named 'processed' right next to 'raw'
-output_dir = r'./data/IRR/processed-filteredByYolo/test/None'
+def parse_args():
+    parser = argparse.ArgumentParser(description="Resize cropped images to 224x224.")
+    parser.add_argument("--input_dir", default=r'./data/crop_test/output_cropped')
+    parser.add_argument("--output_dir", default=r'./data/IRR/processed-filtered-by-yolo/test/None')
+    return parser.parse_args()
+
+
+args = parse_args()
+input_dir = args.input_dir
+output_dir = args.output_dir
 
 print(f"Looking for images in: {input_dir}")
 

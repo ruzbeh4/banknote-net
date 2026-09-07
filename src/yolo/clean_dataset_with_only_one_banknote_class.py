@@ -1,12 +1,22 @@
 import os
 import glob
+import argparse
 
-# Update these paths to match exactly where you extracted the dataset
-label_folders = [
-    "./data/yolo/train/labels",
-    "./data/yolo/valid/labels",
-    "./data/yolo/test/labels"  # If a test folder exists
-]
+def parse_args():
+    parser = argparse.ArgumentParser(description="Collapse YOLO labels to one banknote class.")
+    parser.add_argument(
+        "--label_folders",
+        nargs="+",
+        default=[
+            "./data/yolo/train/labels",
+            "./data/yolo/valid/labels",
+            "./data/yolo/test/labels",
+        ],
+    )
+    return parser.parse_args()
+
+
+label_folders = parse_args().label_folders
 
 files_modified = 0
 

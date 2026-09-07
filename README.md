@@ -6,17 +6,16 @@ An assistive, offline computer vision pipeline designed for resource-constrained
 
 ---
 
-## Benchmark Results (3,877 Test Images)
+## Benchmark Results (4,498 Test Images)
 
-| Metric | Standalone BankNote-Net | Proposed Two-Stage Pipeline |
+| Metric | Standalone BankNote-Net (conf = 0.70) | Proposed Two-Stage Pipeline (conf_yolo = 0.35, conf_bn = 0.40) |
 | :--- | :---: | :---: |
-| **Total Test Images** | 3,877 | 3,877 |
-| **Background Frames Evaluated** | 3,140 | 82 (3,058 filtered by YOLO) |
-| **Background False Positive Rate** | 11.91% (374 errors) | **0.51%** (16 errors) |
-| **Banknote Recognition (39 classes)** | 89.82% (662/737) | **88.87%** (655/737) |
-| **Overall Pipeline Accuracy** | 88.42% | **97.47%** |
-
-[//]: # (| **Inference Frame Rate** | ~10 FPS | **3–4 FPS** &#40;Galaxy S20 FE&#41; |)
+| **Total Test Images** | 4,498 | 4,498 |
+| **Classifier Invocations** | 4,498 | **1,269** (71.79% reduction) |
+| **Background Frames Evaluated** | 3,219 | **87** (3,132 filtered by YOLO) |
+| **Background False Positive Rate** | 11.77% (379 errors) | **0.90%** (29 errors) |
+| **Banknote Recognition (39 classes)** | 84.75% (1,084/1,279) | **82.64%** (1,057/1,279) |
+| **Overall Pipeline Accuracy** | 87.24% (3,924/4,498) | **94.42%** (4,247/4,498) |
 
 ---
 
@@ -65,9 +64,9 @@ This evaluates the version filtered by the YOLO cropper:
 
 ```bash
 conda activate banknote_env
-python src/predict_custom.py --data_path ./data/IRR/processed-filtered-by-yolo --model_path ./src/trained_models/custom_classifier.h5 --threshold 0.7
+python src/predict_custom.py --data_path ./data/IRR/processed-filtered-by-yolo --model_path ./src/trained_models/custom_classifier.h5 --threshold 0.4
 ```
-
+Note that we lower banknote-net threshold duo to successful removal of almost all background images.
 Change `--threshold` to test a different confidence cutoff. Predictions below
 the cutoff are reported as `NONE`. The script prints overall accuracy and
 accuracy on banknote images without background noise.
@@ -89,46 +88,48 @@ class_id center_x center_y width height
 ```
 
 For this project, use one class named `banknote`. If your source dataset has
-separate currency or denomination classes, first edit the paths in
-`src/yolo/clean_dataset_with_only_one_banknote_class.py` and run it from the
-repository root. It changes the first value of every annotation to `0`,
-turning all annotated banknote classes into the single class expected by the
-cropper. Make a backup before running it because it edits label files in place.
+separate currency or denomination classes, run
+`src/yolo/clean_dataset_with_only_one_banknote_class.py` with one or more label
+directories. It changes the first value of every annotation to `0`, turning
+all annotated banknote classes into the single class expected by the cropper.
+Make a backup before running it because it edits label files in place.
 
 Train the nano detector in the YOLO environment:
 
 ```bash
 conda activate yolo_env
-python src/yolo/train_yolo.py
+python src/yolo/clean_dataset_with_only_one_banknote_class.py --label_folders ./data/yolo/train/labels ./data/yolo/valid/labels ./data/yolo/test/labels
+python src/yolo/train_yolo.py --model_path ./yolo26n.pt --data_path ./data/yolo/data.yaml
 ```
 
-The script uses `yolo26n.pt`, `data/yolo/data.yaml`, 50 epochs, 640-pixel
-images, and batch size 16. The best weights are written to
-`runs/detect/banknote_cropper/weights/best.pt`.
+The default values are `yolo26n.pt` and `./data/yolo/data.yaml`, so the
+training command can also be simply `python src/yolo/train_yolo.py`. Training
+uses 50 epochs, 640-pixel images, and batch size 16. The best weights are
+written to `runs/detect/banknote_cropper/weights/best.pt`.
 
 ## Run YOLO Inference and Crop Images
 
-`src/yolo/yolo.py` is a small folder-based inference script. Before running it,
-check these values near the top of the file:
+`src/yolo/yolo.py` is a folder-based inference script. Its path defaults are:
 
-```python
-custom_model_path = "./runs/detect/banknote_cropper/weights/best.pt"
-input_folder = "./data/crop_test/input"
-output_folder_debug = "./data/crop_test/output_debug"
-output_folder_cropped = "./data/crop_test/output_cropped"
+```text
+--model_path ./runs/detect/banknote_cropper/weights/best.pt
+--input_folder ./data/crop_test/input
+--output_folder_debug ./data/crop_test/output_debug
+--output_folder_cropped ./data/crop_test/output_cropped
 ```
 
 Put full camera images in `data/crop_test/input`, then run:
 
 ```bash
 conda activate yolo_env
-python src/yolo/yolo.py
+python src/yolo/yolo.py --model_path ./runs/detect/banknote_cropper/weights/best.pt --input_folder ./data/crop_test/input --output_folder_debug ./data/crop_test/output_debug --output_folder_cropped ./data/crop_test/output_cropped
 ```
 
-The script saves every annotated image to `output_debug`. When it finds a
-largest detection covering more than 30% of the source image, it saves the
-corresponding clean crop to `output_cropped`. Images without a passing box are
-kept only in the debug output.
+The same command without flags uses these defaults. It saves every annotated
+image to `output_debug`. When it finds a largest detection covering more than
+30% of the source image, it saves the corresponding clean crop to
+`output_cropped`. Images without a passing box are kept only in the debug
+output.
 
 ## Move Crops into BankNote-Net Folders
 
@@ -143,19 +144,17 @@ data/IRR/processed-filtered-by-yolo/
 
 `src/image_resizer.py` recursively copies images to a new destination,
 converts them to RGB, applies EXIF rotation, and resizes them to `224x224`.
-It is configured by editing the two path assignments at the bottom of the
-file, then running it from the repository root:
+Pass the source and destination with `--input_dir` and `--output_dir`:
 
 ```bash
 conda activate banknote_env
-python src/image_resizer.py
+python src/image_resizer.py --input_dir ./data/crop_test/output_cropped --output_dir ./data/IRR/processed-filteredByYolo/test/None
 ```
 
-Set `input_dir` to the YOLO crop directory and `output_dir` to the exact class
-folder where those crops belong, for example
-`./data/IRR/processed-filtered-by-yolo/test/None` for background crops. The
-current default output uses the spelling `processed-filteredByYolo`; change it
-if the intended dataset folder is `processed-filtered-by-yolo`.
+The defaults are the YOLO crop directory and
+`./data/IRR/processed-filteredByYolo/test/None`. Set `--output_dir` to the
+exact class folder where the crops belong, for example
+`./data/IRR/processed-filtered-by-yolo/test/None` for background crops.
 
 The current `output_cropped` input is full of `None`-class data rather than
 real banknotes. Sort the crops into the correct denomination/currency folders
@@ -200,65 +199,37 @@ These utilities belong to `banknote_env`:
 ### Latent-space t-SNE
 
 `src/plot_tsne.py` extracts encoder embeddings from `train/` and `test/` and
-saves a two-dimensional plot. Change `--data_path` to compare the unfiltered
-and YOLO-filtered datasets:
+saves a two-dimensional plot. Run it once for the original BankNote-Net data
+and once for the YOLO-filtered pipeline data:
 
 ```bash
 conda activate banknote_env
-python src/plot_tsne.py --data_path ./data/IRR/processed --enc_path ./models/banknote_net_encoder.h5 --save_plot ./tsne_processed.png
-python src/plot_tsne.py --data_path ./data/IRR/processed-filtered-by-yolo --enc_path ./models/banknote_net_encoder.h5 --save_plot ./tsne_filtered.png
+python src/plot_tsne.py --data_path ./data/IRR/processed --enc_path ./models/banknote_net_encoder.h5 --save_plot ./tsne_before_yolo.jpg
+python src/plot_tsne.py --data_path ./data/IRR/processed-filtered-by-yolo --enc_path ./models/banknote_net_encoder.h5 --save_plot ./tsne-after-yolo.png
 ```
+
+The first command produces the pure BankNote-Net latent-space plot;
+the second produces the YOLO + BankNote-Net pipeline plot.
 
 ### Confidence-threshold plot
 
 `src/plot_effect_of_threshold.py` runs `predict_custom.py` repeatedly for
 thresholds from `0.55` through `0.95` and plots overall and banknote-only
-accuracy. It uses the paths and model defaults from `predict_custom.py`; edit
-`TARGET_SCRIPT` or the classifier defaults when comparing another dataset.
-Run it only when you intentionally want all of those repeated evaluations:
+accuracy. Use `--target_script` to select the classifier script and
+`--output_plot` to choose the output image. Run it only when you intentionally
+want all of those repeated evaluations:
 
 ```bash
 conda activate banknote_env
-python src/plot_effect_of_threshold.py
+python src/plot_effect_of_threshold.py --target_script ./src/predict_custom.py --output_plot threshold_evaluation_plot.png
 ```
 
-The output is `threshold_evaluation_plot.png`.
+The output is the tracked root-level file `threshold_evaluation_plot.png`.
 
 ## Export Models to TFLite
 
-### BankNote-Net classifier
-
-Edit `address` in `src/converter.py` to the base path of the classifier H5
-file. For the included custom classifier it should be:
-
-```python
-address = './src/trained_models/custom_classifier'
-```
-
-Then run the converter in `banknote_env`:
-
-```bash
-conda activate banknote_env
-python src/converter.py
-```
-
-It writes the quantized/default-optimized TFLite model beside the H5 file.
-
-### YOLO detector
-
-After training, confirm the weights path in `src/yolo/converter.py` and run it
-in `yolo_env`:
-
-```bash
-conda activate yolo_env
-python src/yolo/converter.py
-```
-
-Ultralytics exports the detector to a `best_saved_model` directory containing
-the TFLite artifact. Copy the resulting YOLO and classifier TFLite files into
-the Android application and keep their preprocessing, input size, output
-format, class order, and confidence threshold consistent with the Python
-pipeline.
+`src/converter.py` converts the BankNote-Net classifier from H5 to an optimized TFLite model.
+`src/yolo/converter.py` exports the trained YOLO detector to TFLite using Ultralytics.
 
 ## Main Files
 

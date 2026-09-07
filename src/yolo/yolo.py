@@ -1,25 +1,47 @@
 import cv2
 import os
+import argparse
+import shutil
 from ultralytics import YOLO
 
-# 1. Automatically load your custom trained weights
-custom_model_path = "./runs/detect/banknote_cropper/weights/best.pt"
+DEBUG_CONFIDENCE_THRESHOLD = 0.35
+MIN_AREA_RATIO = 0.1
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run YOLO banknote detection and cropping.")
+    parser.add_argument("--model_path", default="./runs/detect/banknote_cropper/weights/best.pt")
+    parser.add_argument("--input_folder", default="./data/crop_test/input")
+    parser.add_argument("--output_folder_debug", default="./data/crop_test/output_debug")
+    parser.add_argument("--output_folder_cropped", default="./data/crop_test/output_cropped")
+    parser.add_argument("--threshold", type=float, default=0.25)
+    parser.add_argument("--clear_output", action=argparse.BooleanOptionalAction, default=True)
+    return parser.parse_args()
+
+
+args = parse_args()
+custom_model_path = args.model_path
 model = YOLO(custom_model_path)
 
 print("\n--- MODEL VERIFICATION ---")
 print(f"Classes known by this model: {model.names}")
 print("--------------------------\n")
 
-input_folder = "./data/crop_test/input"
-output_folder_debug = "./data/crop_test/output_debug"
-output_folder_cropped = "./data/crop_test/output_cropped"
+input_folder = args.input_folder
+output_folder_debug = args.output_folder_debug
+output_folder_cropped = args.output_folder_cropped
 
-# Create both directories if they don't exist
+# Clear previous results by default, then recreate both output directories.
+if args.clear_output:
+    shutil.rmtree(output_folder_debug, ignore_errors=True)
+    shutil.rmtree(output_folder_cropped, ignore_errors=True)
+    print(f"Deleted all contents of debug output folder: {output_folder_debug}")
+    print(f"Deleted all contents of cropped output folder: {output_folder_cropped}")
+
 os.makedirs(output_folder_debug, exist_ok=True)
 os.makedirs(output_folder_cropped, exist_ok=True)
 
 # 2. Run inference
-results = model(input_folder, stream=True)
+results = model(input_folder, stream=True, conf=DEBUG_CONFIDENCE_THRESHOLD)
 
 for i, result in enumerate(results):
     # Make a copy of the image so we can draw shapes on it later
@@ -34,9 +56,12 @@ for i, result in enumerate(results):
     for box in result.boxes:
         x1, y1, x2, y2 = map(int, box.xyxy[0])
         box_area = (x2 - x1) * (y2 - y1)
+        confidence = float(box.conf[0])
         area_percentage = box_area / total_image_area
 
-        if box_area > max_area and area_percentage > 0.30:
+        if (confidence >= args.threshold
+            and area_percentage > MIN_AREA_RATIO
+            and box_area > max_area):
             max_area = box_area
             best_box = (x1, y1, x2, y2)
 
@@ -54,20 +79,21 @@ for i, result in enumerate(results):
 
         box_area = (x2 - x1) * (y2 - y1)
         area_percentage = (box_area / total_image_area) * 100
+        confidence = float(box.conf[0])
 
         cls_id = int(box.cls[0])
         label = model.names[cls_id]
 
-        is_best = best_box and (x1, y1, x2, y2) == best_box
+        is_best = best_box is not None and (x1, y1, x2, y2) == best_box
 
         if is_best:
             color = (0, 255, 0)  # Green for passing
             thickness = 3
-            status = f"PASS ({area_percentage:.1f}%)"
+            status = f"PASS (Conf: {confidence:.2f}, Area: {area_percentage:.1f}%)"
         else:
             color = (0, 0, 255)  # Red for failing
             thickness = 1
-            status = f"FAIL ({area_percentage:.1f}%)"
+            status = f"FAIL (Conf: {confidence:.2f}, Area: {area_percentage:.1f}%)"
 
         # Draw the rectangle and label
         cv2.rectangle(img_drawn, (x1, y1), (x2, y2), color, thickness)

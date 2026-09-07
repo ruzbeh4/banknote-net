@@ -1,13 +1,23 @@
+import argparse
+
 from ultralytics import YOLO
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train the YOLO banknote detector.")
+    parser.add_argument("--model_path", default="yolo26n.pt")
+    parser.add_argument("--data_path", default="./data/yolo/data.yaml")
+    return parser.parse_args()
 
 # Put the execution logic inside this block!
 if __name__ == '__main__':
+    args = parse_args()
     # 1. Load the base pre-trained Nano model
-    model = YOLO('yolo26n.pt')
+    model = YOLO(args.model_path)
 
     # 2. Train it on your newly cleaned dataset
     model.train(
-        data='./data/yolo/data.yaml',
+        data=args.data_path,
         epochs=50,
         imgsz=640,
         batch=16,

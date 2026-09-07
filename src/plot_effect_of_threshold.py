@@ -2,6 +2,7 @@ import subprocess
 import sys
 import re
 import os
+import argparse
 import matplotlib.pyplot as plt
 
 # ==========================================
@@ -21,14 +22,23 @@ final_accuracies = []
 banknote_accuracies = []
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Plot accuracy across confidence thresholds.")
+    parser.add_argument("--target_script", default=TARGET_SCRIPT)
+    parser.add_argument("--output_plot", default="threshold_evaluation_plot.png")
+    return parser.parse_args()
+
+
 def main():
-    print(f"Starting threshold evaluation loop on {TARGET_SCRIPT}...\n")
+    args = parse_args()
+    target_script = args.target_script
+    print(f"Starting threshold evaluation loop on {target_script}...\n")
 
     for threshold in thresholds:
         print(f"Running test for threshold: {threshold:.2f}...", end=" ", flush=True)
 
         # Build the command using the current Python executable
-        cmd = [sys.executable, TARGET_SCRIPT, "--threshold", str(threshold)]
+        cmd = [sys.executable, target_script, "--threshold", str(threshold)]
 
 
 
@@ -43,8 +53,8 @@ def main():
             sys.exit(1)
 
         # Parse the percentages from the output using Regular Expressions
-        acc_match = re.search(r"Final Accuracy:.*?\(([\d\.]+)%\)", output)
-        banknote_match = re.search(r"Accuracy without background noise:.*?\(([\d\.]+)%\)", output)
+        acc_match = re.search(r"Banknote-net Accuracy:.*?\(([\d\.]+)%\)", output)
+        banknote_match = re.search(r"Accuracy on only banknotes:.*?\(([\d\.]+)%\)", output)
 
         if acc_match and banknote_match:
             acc = float(acc_match.group(1))
@@ -83,8 +93,8 @@ def main():
     plt.legend(loc='lower left')
 
     # Save the plot as an image file and show it
-    plt.savefig('threshold_evaluation_plot.png', dpi=300, bbox_inches='tight')
-    print("Plot saved as 'threshold_evaluation_plot.png'.")
+    plt.savefig(args.output_plot, dpi=300, bbox_inches='tight')
+    print(f"Plot saved as '{args.output_plot}'.")
 
     plt.show()
 

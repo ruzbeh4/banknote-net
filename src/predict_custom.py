@@ -4,12 +4,15 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+# change this two parameters if you changed dataset
+DATASET_SIZE = 4498
+BANKNOTE_SHARE = 1279
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--bsize", type=int, default=1)
-    # switch to processed-filtered-by-yolo to see pipeline of yolo+banknote-net results
-    parser.add_argument("--data_path", type=str, default="./data/IRR/processed", help="Path to IRR folder containing train/ and test/")
+    # switch to data path to processed to see original banknote-net results
+    parser.add_argument("--data_path", type=str, default="./data/IRR/processed/", help="Path to IRR folder containing train/ and test/")
     parser.add_argument("--model_path", type=str, default="./src/trained_models/custom_classifier.h5")
     parser.add_argument("--threshold", type=float, default=0.7)
     return parser.parse_args()
@@ -71,10 +74,15 @@ def main():
 
         print(f"[{status}] {full_path:<40} -> Predicted: {pred_label:<18} (Conf: {conf:.2f})")
 
-    acc = (correct / test_gen.samples) * 100
-    banknote_acc = (corrects_without_background_noise / total_banknotes) * 100
-    print(f"\nFinal Accuracy: {correct}/{test_gen.samples} ({acc:.2f}%)")
-    print(f"\nAccuracy without background noise: {corrects_without_background_noise}/{total_banknotes} ({banknote_acc:.2f}%)")
+    banknote_net_acc = (correct / test_gen.samples) * 100
+    banknote_acc = (corrects_without_background_noise / BANKNOTE_SHARE) * 100
+    pipeline_corrects = correct + (DATASET_SIZE - test_gen.samples - (BANKNOTE_SHARE - total_banknotes))
+    pipeline_acc = (pipeline_corrects / DATASET_SIZE) * 100
+    print(f"\nBanknote-net Accuracy: {correct}/{test_gen.samples} ({banknote_net_acc:.2f}%)")
+    print(f"Accuracy on only banknotes: {corrects_without_background_noise}/{BANKNOTE_SHARE} ({banknote_acc:.2f}%)")
+
+    if DATASET_SIZE != test_gen.samples: print(f"\nfinal pipeline Accuracy: {pipeline_corrects}/{DATASET_SIZE} ({pipeline_acc:.2f}%)")
+    else: print(f"\nNo Yolo stage: final accuracy is equal to Banknote-net Accuracy: {banknote_net_acc:.2f}%")
 
 if __name__ == "__main__":
     main()

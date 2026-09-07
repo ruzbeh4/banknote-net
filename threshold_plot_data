@@ -1,0 +1,9 @@
+Running test for threshold: 0.55... Overall: 83.66% | Banknote: 88.27%
+Running test for threshold: 0.60... Overall: 84.70% | Banknote: 86.71%
+Running test for threshold: 0.65... Overall: 85.97% | Banknote: 86.00%
+Running test for threshold: 0.70... Overall: 87.24% | Banknote: 84.75%
+Running test for threshold: 0.75... Overall: 88.55% | Banknote: 83.27%
+Running test for threshold: 0.80... Overall: 89.35% | Banknote: 82.10%
+Running test for threshold: 0.85... Overall: 89.93% | Banknote: 79.36%
+Running test for threshold: 0.90... Overall: 90.11% | Banknote: 76.00%
+Running test for threshold: 0.95... Overall: 89.77% | Banknote: 70.05%
